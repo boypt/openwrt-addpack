@@ -8,8 +8,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=samba4
-PKG_VERSION:=4.0.25
-PKG_RELEASE:=1
+PKG_VERSION:=4.0.26
+PKG_RELEASE:=3
 
 PKG_SOURCE_URL:=http://ftp.samba.org/pub/samba \
 	http://ftp.samba.org/pub/samba/old-versions
@@ -38,7 +38,7 @@ define Package/samba4-server
   TITLE:=Samba $(PKG_VERSION) SMB/CIFS server with ADS support
   URL:=http://www.samba.org/
   VARIANT:=samba4-server
-  DEPENDS:=+USE_EGLIBC:librt +libpopt +libuuid +libopenldap-sasl +krb5-mit-libs +krb5-mit-client +libiconv +libacl +libreadline +libaio +libtirpc +wsdd
+  DEPENDS:=+USE_EGLIBC:librt +libuuid +libaio +libpthread
 endef
 
 define Package/samba4-client
@@ -46,7 +46,7 @@ define Package/samba4-client
   CATEGORY:=Network
   TITLE:=Samba $(PKG_VERSION) SMB/CIFS client
   URL:=http://www.samba.org/
-  DEPENDS:=+libreadline +libncurses +libopenldap-sals +krb5-mit-libs +libaio +zlib
+  DEPENDS:=+libreadline +libncurses +libaio +libpthread
 endef
 
 define Package/samba4-server/config
@@ -76,14 +76,13 @@ TARGET_CFLAGS += \
 	-D_GNU_SOURCE \
 	-D__location__=\\\"\\\" \
 	-ffunction-sections -fdata-sections \
-	-I$(STAGING_DIR)/usr/include/krb5 \
 	-DACTIVE_DIRECTORY \
 	-DDFS_SUPPORT \
 	-DNETLOGON_SUPPORT \
 	-DSAMR_SUPPORT \
 	-DLSA_SUPPORT
 
-TARGET_LDFLAGS += -Wl,--gc-sections -ltirpc
+TARGET_LDFLAGS += -Wl,--gc-sections -laio -ldl
 
 CONFIGURE_VARS += \
 	ac_cv_file__proc_sys_kernel_core_pattern=yes \
@@ -125,11 +124,8 @@ CONFIGURE_VARS += \
 	samba_cv_have_setresuid=yes \
 	samba_cv_have_setresgid=yes \
 	samba_cv_linux_getgrouplist_ok=yes \
-	ac_cv_header_zlib_h=yes \
-	samba_cv_zlib_1_2_3=yes \
-	ac_cv_lib_ext_krb5_krb5_mk_req_extended=yes \
-	smb_krb5_cv_enctype_to_string_takes_krb5_context_arg=no \
-	smb_krb5_cv_enctype_to_string_takes_size_t_arg=yes
+	ac_cv_header_zlib_h=no \
+	samba_cv_zlib_1_2_3=no
 
 CONFIGURE_ARGS += \
 	--exec-prefix=/usr \
@@ -141,11 +137,13 @@ CONFIGURE_ARGS += \
 	--disable-static \
 	--disable-swat \
 	--disable-shared-libs \
+	--with-codepagedir=/etc/samba \
 	--with-configdir=/etc/samba \
 	--with-included-iniparser \
 	--with-included-popt \
 	--with-lockdir=/var/lock \
 	--with-logfilebase=/var/log \
+	--with-nmbdsocketdir=/var/nmbd \
 	--with-piddir=/var/run \
 	--with-privatedir=/etc/samba \
 	--with-sendfile-support \
@@ -158,15 +156,11 @@ CONFIGURE_ARGS += \
 	--without-libnetapi \
 	--without-libsmbclient \
 	--without-libsmbsharemodes \
-	--with-ads \
-	--with-krb5=$(STAGING_DIR)/usr \
-	--with-ldap \
-	--with-libiconv=$(STAGING_DIR)/usr/lib/libiconv \
-	--with-acl-support \
-	--with-quotas \
+	--without-ads \
+	--without-krb5 \
+	--without-ldap \
 	--with-syslog \
-	--with-shared-modules=pdb_tdbsam,pdb_wbc_sam,idmap_nss,nss_info_template,auth_winbind,auth_wbc,auth_domain,vfs \
-	--with-static-modules=vfs_default,vfs_dirsort,vfs_posixacl,vfs_daio_linux
+	--with-shared-modules=pdb_tdbsam,pdb_wbc_sam,idmap_nss,nss_info_template,auth_winbind,auth_wbc,auth_domain
 
 MAKE_FLAGS += DYNEXP= PICFLAG= MODULES=
 
@@ -193,11 +187,6 @@ define Package/samba4-server/install
 	ln -sf ../sbin/$(PKG_NAME)_multicall $(1)/usr/bin/smbcacls
 	ln -sf ../sbin/$(PKG_NAME)_multicall $(1)/usr/bin/nmblookup
 	ln -sf ../sbin/$(PKG_NAME)_multicall $(1)/usr/bin/testparm
-	$(INSTALL_DIR) $(1)/etc/openldap/schema
-	$(CP) $(PKG_BUILD_DIR)/examples/LDAP/samba.schema $(1)/etc/openldap/schema
-	$(INSTALL_DIR) $(1)/etc/samba
-	ln -sf /var/etc/secrets.tdb $(1)/etc/samba/secrets.tdb
-	ln -sf /var/etc/schannel_store.tdb $(1)/etc/samba/schannel_store.tdb
 endef
 
 define Package/samba4-server/conffiles
